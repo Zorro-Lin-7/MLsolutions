@@ -73,6 +73,24 @@ def corrplot(df):
     plt.show()
 
 
+# 特征相关性分析
+# 特征关联分析：遍历拎出每个特征作target，用剩余特征来回归算法比如DecisionTreeRegressor预测，得到 R2R2  score 。
+# R2R2 在0-1 之间，1表示X完美拟合y；负数表示模型拟合失败，即该特征与其他特征无相关性，无法由其他自变量推测出。
+# 也就是说，该特征是必需的，because the remaining features cannot explain the variation in them.
+from sklearn.cross_validation import train_test_split
+from sklearn.tree import DecisionTreeRegressor
+dep_vars = list(train.columns)
+for var in dep_vars:
+    new_data = train.drop([var], axis=1)
+    new_feature = pd.DataFrame(train.loc[:, var])
+    X_train, X_test, y_train, y_test = train_test_split(new_data, new_feature, test_size=0.3, random_state=42)
+    
+    dtr = DecisionTreeRegressor(random_state=42)
+    dtr.fit(X_train, y_train)
+    score = dtr.score(X_test, y_test)
+    print(var, 'R2 score: ',score)
+    
+
 # KNN
 KNeighborsClassifier(n_neighbors=5,
                      weights='uniform',
@@ -134,3 +152,28 @@ RandomForestClassifier(n_estimators=10,
                        random_state=None,
                        verbose=0,
                        )
+                       
+                       
+def predn(df, target):
+    """
+    缺失值处理：将含缺失值的feature作为targe，用无缺失的features来训练预测
+    df: Xcomplete
+    target: 'f210'
+    """
+    tempX = df.loc[df[target].notnull(), 'f1':'f19'].drop('f5', axis=1)
+    tempy = df.loc[df[target].notnull(), target]
+
+    tempTest = df.loc[df[target].isnull(), 'f1':'f19'].drop('f5', axis=1)
+    
+    X_train, X_test, y_train, y_test = train_test_split(tempX, tempy, test_size=0.2, random_state=42)
+    
+    xgbr = xgb.XGBRegressor(random_state=42)
+    xgbr.fit(X_train, y_train)
+    score = xgbr.score(X_test, y_test)
+    print('R2 score: ', score)
+    
+    xgbr.fit(tempX, tempy)
+    ypred = xgbr.predict(tempTest)
+    return ypred
+    
+    
