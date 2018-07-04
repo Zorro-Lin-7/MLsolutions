@@ -91,6 +91,28 @@ for var in dep_vars:
     print(var, 'R2 score: ',score)
     
 
+    
+    
+    X_train, X_test, y_train, y_test = train_test_split(tempX, tempy, test_size=0.2, random_state=42)
+    
+    xgbr = xgb.XGBRegressor(random_state=42)
+    xgbr.fit(X_train, y_train)
+    score = xgbr.score(X_test, y_test)
+    print('R2 score: ', score)
+    
+    model = xgbr.fit(tempX, tempy)
+    return model
+
+# 返回要预测的缺失列
+def getTargetDf(df, target, other):
+    target = df.loc[df[target].isnull(), other].copy()
+    return target
+
+nullmod = nullmod(df, target, other)
+y210 = getTargetDf(df, target, other)
+ypred = nullmod.predict(y210)
+y210[target] = ypred
+#-------------------------------------------
 # KNN
 KNeighborsClassifier(n_neighbors=5,
                      weights='uniform',
@@ -152,28 +174,6 @@ RandomForestClassifier(n_estimators=10,
                        random_state=None,
                        verbose=0,
                        )
-                       
-                       
-def predn(df, target):
-    """
-    缺失值处理：将含缺失值的feature作为targe，用无缺失的features来训练预测
-    df: Xcomplete
-    target: 'f210'
-    """
-    tempX = df.loc[df[target].notnull(), 'f1':'f19'].drop('f5', axis=1)
-    tempy = df.loc[df[target].notnull(), target]
+# -----------------------                       
 
-    tempTest = df.loc[df[target].isnull(), 'f1':'f19'].drop('f5', axis=1)
-    
-    X_train, X_test, y_train, y_test = train_test_split(tempX, tempy, test_size=0.2, random_state=42)
-    
-    xgbr = xgb.XGBRegressor(random_state=42)
-    xgbr.fit(X_train, y_train)
-    score = xgbr.score(X_test, y_test)
-    print('R2 score: ', score)
-    
-    xgbr.fit(tempX, tempy)
-    ypred = xgbr.predict(tempTest)
-    return ypred
-    
     
