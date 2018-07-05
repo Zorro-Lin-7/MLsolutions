@@ -228,4 +228,70 @@ votingMod = VotingClassifier(estimators=[('gb', bestGbModFitted_transformed),
                                          ('ada', bestAdaModFitted_transformed)], 
                              voting='soft',weights=[2,1])
 votingMod = votingMod.fit(X_train_transform, y_train)
+
+#----------- 调参  
+# GridSearchCV  VS RandomizedSearchCV  https://blog.csdn.net/juezhanangle/article/details/80051256
+# GridSearchCV 即网格搜索和交叉验证，
+# 可以保证在指定的参数范围内找到精度最高的参数，但是这也是网格搜索的缺陷所在，它要求遍历所有可能参数的组合，
+# 在面对大数据集和多参数的情况下，非常耗时；
+# 再加上CV，更加耗时：
+· 将训练数据集划分为K份，K一般为10
+· 依次取其中一份为验证集，其余为训练集训练分类器，测试分类器在验证集上的精度 
+· 取K次实验的平均精度为该分类器的平均精度
+
+# RandomizedSearchCV
+以在参数空间中随机采样 代替 网格遍历搜索，在对于有连续变量的参数时，将其当作一个分布进行采样，它的搜索能力取决于设定的n_iter参数。
+一般建议使用 RandomizedSearchCV，尤其大规模数据集上的集成算法。
+
+
+# 二者用法一致，代码如下
+from sklearn.grid_search import GridSearchCV
+from sklearn.grid_search import RandomizedSearchCV
+ 
+clf1 = xgb.XGBClassifier()
+
+param_dist = {
+        'n_estimators':range(80,200,4),
+        'max_depth':range(2,15,1),
+        'learning_rate':np.linspace(0.01,2,20),
+        'subsample':np.linspace(0.7,0.9,20),
+        'colsample_bytree':np.linspace(0.5,0.98,10),
+        'min_child_weight':range(1,9,1)
+        }
+
+grid = GridSearchCV(clf1,                      # 训练器
+                    param_dist,                # 参数空间，字典类型
+                    cv = 3,   
+                    scoring = 'neg_log_loss',
+                    n_iter=300,                # n_iter=300，训练300次，数值越大，获得的参数精度越大，但是搜索时间越长
+                    n_jobs = -1
+                    )
+ 
+
+grid.fit(traindata.values,np.ravel(trainlabel.values)) #在训练集上训练
+
+best_estimator = grid.best_estimator_  #返回最优的训练器
+print(best_estimator)
+
+print(grid.best_score_)  #输出最优训练器的精度
+
+# 自定义评分参数 scoring:
+import numpy as np
+from sklearn.metrics import make_scorer
+ 
+def logloss(act, pred):
+    epsilon = 1e-15
+    pred = sp.maximum(epsilon, pred)
+    pred = sp.minimum(1-epsilon, pred)
+    ll = sum(act*sp.log(pred) + sp.subtract(1, act)*sp.log(sp.subtract(1, pred)))
+    ll = ll * -1.0/len(act)
+    return ll
+ 
+#这里的greater_is_better参数决定了自定义的评价指标是越大越好还是越小越好
+loss  = make_scorer(logloss, greater_is_better=False)
+score = make_scorer(logloss, greater_is_better=True)
+
+
+
+
     
