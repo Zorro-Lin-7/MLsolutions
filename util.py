@@ -115,9 +115,16 @@ def dependent(feature, df, gt=0.6):
 
 # 特征工程-------------------
 
-#纠正偏态分布
+#纠正偏态分布，一些特征值更可能自然分布，所以用自然对数转换
 log_data = np.log(data + 1)
 pd.plotting.scatter_matrix(log_data, alpha=0.3, figsize=(14, 8), diagonal='kde')
+
+import numpy as np
+from sklearn.preprocessing import FunctionTransformer
+
+transformer = FunctionTransformer(np.log1p)
+X_train_1 = np.array(X_train)
+X_train_transform = transformer.transform(X_train_1)
 
 # 用其他features 回归预测缺失值     
 # 返回预测模型          
@@ -214,5 +221,11 @@ RandomForestClassifier(n_estimators=10,
                        verbose=0,
                        )
 # -----------------------                       
-
+# 基于投票的集成方法 Voting-based ensenmble ML model
+# 先将baseline 做CV 优化得到best，在集成
+from sklearn.ensemble import VotingClassifier
+votingMod = VotingClassifier(estimators=[('gb', bestGbModFitted_transformed),  
+                                         ('ada', bestAdaModFitted_transformed)], 
+                             voting='soft',weights=[2,1])
+votingMod = votingMod.fit(X_train_transform, y_train)
     
