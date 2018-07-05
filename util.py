@@ -11,6 +11,18 @@ from sklearn.ensemble import (
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import roc_auc_score
 
+
+# 数据类型转换：减少内存
+floatcols = df.select_dtypes(include=['float64']).columns
+intcols = []
+fltcols = []
+for col in floatcols:
+    if np.modf(df[col])[0].sum() == 0:
+        intcols.append(col)
+        df[col] = df.astype(np.int16, errors='ignore')
+    else:
+        fltcols.append(col)
+
 # EDA
 # 统计labels
 def percentage_labels(df, label, **params):
@@ -90,6 +102,33 @@ for var in dep_vars:
     score = dtr.score(X_test, y_test)
     print(var, 'R2 score: ',score)
     
+# 与某单变量相关的所有变量：    
+def dependent(feature, df, gt=0.6):
+	dependence = []
+	for col in df.columns:
+		corrn = df[feature].corr(df[col])
+		if corrn >= gt:
+			dependence.append((col, corrn))
+	d = pd.DataFrame(dependence, columns=['features','coef'])
+	return d
+
+
+# 特征工程-------------------
+
+#纠正偏态分布
+log_data = np.log(data + 1)
+pd.plotting.scatter_matrix(log_data, alpha=0.3, figsize=(14, 8), diagonal='kde')
+
+# 用其他features 回归预测缺失值     
+# 返回预测模型          
+def nullmod(df, target, other):
+    """
+    df: Xcomplete
+    target: 'f210'
+    other: ['f110','f209','f106','f81','f105','f73','f75','f109','f208','f74','f72','f80','f104']
+    """
+    tempX = df.loc[df[target].notnull(), other]
+    tempy = df.loc[df[target].notnull(), target]
 
     
     
