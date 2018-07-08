@@ -226,7 +226,8 @@ RandomForestClassifier(n_estimators=10,
 from sklearn.ensemble import VotingClassifier
 votingMod = VotingClassifier(estimators=[('gb', bestGbModFitted_transformed),  
                                          ('ada', bestAdaModFitted_transformed)], 
-                             voting='soft',weights=[2,1])
+                             voting='soft', # soft 平均的是概率值
+                             weights=[2,1])
 votingMod = votingMod.fit(X_train_transform, y_train)
 
 #----------- 调参  
@@ -291,7 +292,107 @@ def logloss(act, pred):
 loss  = make_scorer(logloss, greater_is_better=False)
 score = make_scorer(logloss, greater_is_better=True)
 
+#-----------------ROC 曲线
+def plot_roc_curve(prob_y, y):
+    fpr, tpr, _ = roc_curve(y, prob_y)
+    c_stats = auc(fpr, tpr)
+    plt.plot([0, 1], [0, 1], 'r--')
+    plt.plot(fpr, tpr, label="ROC curve")
+    s = "AUC = %.4f" % c_stats
+    plt.xticks([0.001, 0.005, 0.01], fontsize=10)
+    plt.text(0.6, 0.2, s, bbox=dict(facecolor='red', alpha=0.5))
+    plt.xlabel('False positive rate')
+    plt.ylabel('True positive rate')
+    plt.title('ROC curve')#ROC 曲线
+    plt.legend(loc='best')
+    plt.show()
+
+def evalate(model, X_train, y_train, X_test, y_test):
+    model.fit(X_train.values, y_train.values)
+    yp = model.predict_proba(X_test.values)[:, 1]
+    plot_roc_curve(yp, y_test)
+    return model
 
 
 
+
+#---------------------
+# 对于不均衡数据集的处理：欠采样出n个均衡子集，假设训练得到 n=5 个基学习器，再集成:
+# 用这5 个学习器预测，分布得到5 个 y_pred 和 y_prob值，如对一个新样本，5个y_pred 中有3个以上判为1，
+# 则其最终的 y_prob = 3个prob / 3
+# 以下采用xgboost
+
+def stratified(X, n_subsets):
+    '''
+    X: 占多数的label=0 样本集
+    n_subsets: n个子样本集
+    '''
+    n_samples = X.shape[0]
+    subsetId = np.random.randint(0, n_subsets, n_samples)
+    X['subsetId'] = subsetId
+    return X
+
+def training_baselines(X, X1, n_subsets, dump=True, filename='baseline', verbose=True):
+    """
+    X: 占多数的label=0 样本集
+    X1: 占少数的label=1 样本集
+    n_subsets: n个子样本集
+    dump: 是否保存训练好的子模型到本地，也会耗时间
+    filename: 若dump=True，文件名
+    """
     
+    X = stratified(X, n_subsets)
+    
+    baselines = []
+    y1 = np.array([0] * X1.shape[0])
+    for i in range(n_subsets):
+        # 欠采样
+        tempX0 = X[X.subsetId == i].drop('subsetId', axis=1)  
+        tempy0 = np.array([0] * tempX0.shape[0])            
+
+        tempX = pd.concat([tempX0, X1])                         # 合并子集和 label=1的 X
+        tempy = np.append(tempy0, y1)
+        
+        # 训练baseline
+        
+        params = dict(
+        max_depth         = 3 + i//10,
+        n_estimators      = 200 - i,
+        n_jobs            = -1,
+        reg_alpha         = 0.1,
+        subsample         = 0.7,
+        colsample_bytree  = 0.5,
+        colsample_bylevel = 0.7,
+        random_state      = 80,
+        silent            = False,
+        )
+        
+        model = xgb.XGBClassifier(**params)
+        temp_baseline = model.fit(tempX, tempy)
+        baselines.append(temp_baseline)
+        if dump:
+            joblib.dump(temp_baseline, '{}{}.pkl'.format(filename, i))
+        if verbose:
+            print("Done {}".format(i))
+    
+# 集成预测
+def ensemble_predict(baselines, Xtest, verbose=True):
+    p = pd.DataFrame()
+    for i, baseline in enumerate(baselines):
+        base = 'base' + str(i)
+        p[base] = baseline.predict_proba(Xtest)[:,1]
+        if verbose:
+            print("Done {}".format(i))
+
+    p2 = p.copy(deep=True)
+    p2['v1'] = (p2 >=0.5).sum(1)
+    total = len(baselines)
+    half = len(baselines) // 2
+    p2['score'] = np.where(p2.v1 > half,
+                           (p[p >=0.5].sum(1)) / p2.v1,
+                           (p[p < 0.5].sum(1)) / (total - p2.v1))
+    return p2.score.values
+    
+# 调用示例：
+# baselines = training_baselines(X, X1, n_subsets, dump=True, filename='baseline', verbose=True)
+# test_score = ensemble_predict(baselines, Xtest, verbose=True)   
