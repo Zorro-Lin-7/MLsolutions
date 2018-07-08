@@ -77,6 +77,7 @@ def missing_barplot(df):
 
 # 特征相关性热图
 def corrplot(df):
+    plt.figure(figsize=(16,9))
     sns.set()
     sns.heatmap(df.corr(),
                 annot=True,   # 标注文本信息
@@ -322,6 +323,56 @@ def evalate(model, X_train, y_train, X_test, y_test):
 # 则其最终的 y_prob = 3个prob / 3
 # 以下采用xgboost
 
+%%time
+# !!!!
+# 31 个 baselines
+
+sampleid = np.random.randint(0, 32, 979246)
+X0['sampleid'] = sampleid
+
+
+models31 = []
+for i in range(31):
+    tempX0 = X0[X0.sampleid == i].drop('sampleid', axis=1)  # label=0 子集
+    tempy0 = np.array([0] * tempX0.shape[0])                 # label=0 子集的 y
+    
+    tempX = pd.concat([tempX0, X1])                         # 合并子集和 label=1的 X
+    tempy = np.append(tempy0, y1)
+    # 训练
+    params = dict(
+    max_depth         = 3 + i // 5,
+    n_estimators      = 300 - i * 9,
+    n_jobs            = -1,
+    reg_alpha         = 0.01,
+    subsample         = 0.8,
+    colsample_bytree  = 0.5,
+    scale_pos_weight  = 2,
+    random_state      = 80,
+        
+    silent            = False,
+    )
+    tempmodel = xgb.XGBClassifier(**params)
+    basemodel = tempmodel.fit(tempX, tempy)
+    models31.append(basemodel)
+    #joblib.dump(basemodel, 'c_base{}'.format(i))
+    print("Done {}".format(i))
+
+# 集成预测：
+p = pd.DataFrame()
+for i, clf in enumerate(models31):
+    base = 'base' + str(i)
+    p[base] = clf.predict_proba(test)[:,1]
+    print(i)
+    
+p2 = p.copy(deep=True)
+p2['v1'] = (p2 >=0.5).sum(1)
+
+p2['score'] = np.where(p2.v1 > 15,
+                       p[p >=0.5].sum(1)/p2.v1,
+                       p[p < 0.5].sum(1)/(31 - p2.v1)) 
+                       
+# 以下是上面的封装：                       
+
 def stratified(X, n_subsets):
     '''
     X: 占多数的label=0 样本集
@@ -374,6 +425,8 @@ def training_baselines(X, X1, n_subsets, dump=True, filename='baseline', verbose
             joblib.dump(temp_baseline, '{}{}.pkl'.format(filename, i))
         if verbose:
             print("Done {}".format(i))
+            
+    return baselines
     
 # 集成预测
 def ensemble_predict(baselines, Xtest, verbose=True):
@@ -392,7 +445,25 @@ def ensemble_predict(baselines, Xtest, verbose=True):
                            (p[p >=0.5].sum(1)) / p2.v1,
                            (p[p < 0.5].sum(1)) / (total - p2.v1))
     return p2.score.values
+
+# 获取非0的重要特征（并集）
+def getFeatures(baselines, columns, how='union'): 
+    baseline = baselines[0]
+	f = np.where(baseline.feature_importances_)  # np.where 默认查找非0元素的index √
+	if how == 'union':
+		for m in baselines:
+			fm = np.where(m.feature_importances_)  
+			f  = np.union1d(f, fm)
+	elif how == 'inner':
+		for m in baselines:
+			fm = np.where(m.feature_importances_)
+			f  = np.intersect1d(f, fm)
+	features = columns[f]
+	return features
     
 # 调用示例：
 # baselines = training_baselines(X, X1, n_subsets, dump=True, filename='baseline', verbose=True)
 # test_score = ensemble_predict(baselines, Xtest, verbose=True)   
+# features = getFeatures(baselines, how='union')
+
+
