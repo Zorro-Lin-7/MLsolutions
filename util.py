@@ -92,16 +92,23 @@ def corrplot(df):
 # 也就是说，该特征是必需的，because the remaining features cannot explain the variation in them.
 from sklearn.cross_validation import train_test_split
 from sklearn.tree import DecisionTreeRegressor
-dep_vars = list(train.columns)
-for var in dep_vars:
-    new_data = train.drop([var], axis=1)
-    new_feature = pd.DataFrame(train.loc[:, var])
-    X_train, X_test, y_train, y_test = train_test_split(new_data, new_feature, test_size=0.3, random_state=42)
-    
-    dtr = DecisionTreeRegressor(random_state=42)
-    dtr.fit(X_train, y_train)
-    score = dtr.score(X_test, y_test)
-    print(var, 'R2 score: ',score)
+
+def varr(df):
+    dep_vars = df.columns
+    r2 = []
+    for var in dep_vars:
+        new_data = df.drop([var], axis=1)
+        new_feature = pd.DataFrame(df.loc[:, var])
+        X_train, X_test, y_train, y_test = train_test_split(new_data, new_feature, test_size=0.3, random_state=42)
+
+        dtr = DecisionTreeRegressor(random_state=42)
+        dtr.fit(X_train, y_train)
+        score = dtr.score(X_test, y_test)
+        r2.append((var, score))
+        print(var, 'Done')
+    R2 = pd.DataFrame(r2, columns=['feature', 'r2_score'])
+        
+    return R2
     
 # 与某单变量相关的所有变量：    
 def dependent(feature, df, gt=0.6):
