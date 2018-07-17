@@ -473,4 +473,7 @@ def getFeatures(baselines, columns, how='union'):
 # test_score = ensemble_predict(baselines, Xtest, verbose=True)   
 # features = getFeatures(baselines, how='union')
 
+#-----------pandas 常用代码
+X = X.loc[(X < 0).sum(1) == 0]  # 不含缺失数据的行（如-1， -2 值）
+df.loc[(df > 0.2).any(1)]
 
