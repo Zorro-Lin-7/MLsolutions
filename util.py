@@ -477,3 +477,10 @@ def getFeatures(baselines, columns, how='union'):
 X = X.loc[(X < 0).sum(1) == 0]  # 不含缺失数据的行（如-1， -2 值）
 df.loc[(df > 0.2).any(1)]
 
+gb = df.groupby('label')  # 字典：key是label的值，group是对应的组
+gb.get_group(1)  # label=1
+for name, group in gb:
+    pos = group[group['y'] == 1]
+    neg = group[group['y'] == 0]
+
+
