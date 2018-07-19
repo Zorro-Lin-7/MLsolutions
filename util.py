@@ -473,6 +473,43 @@ def getFeatures(baselines, columns, how='union'):
 # test_score = ensemble_predict(baselines, Xtest, verbose=True)   
 # features = getFeatures(baselines, how='union')
 
+
+#-------------------决策树可视化，深度、宽度调参 -- via 机器之心-集成：https://mp.weixin.qq.com/s/yY_-qJoza2xGRqrm40abkg
+import pydotplus
+from IPython.display import display
+from IPython.display import Image
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.tree import export_graphviz
+d = display
+
+def print_graph(clf, feature_names):
+    """print decision tree.
+    每个叶节点记录它们在训练样本中的比例、类别分布和类别标签预测。
+    """
+    graph = export_graphviz(
+        clf,
+        label='root',
+        proportion=True,
+        impurity=False,
+        out_file=None,
+        feature_names=feature_names,
+        class_names ={
+            0: 'D',
+            1: 'R',
+        },
+        filled=True,
+        rounded=True,
+    )
+    graph = pydotplus.graph_from_dot_data(graph)
+    return Image(graph.create_png())
+    
+# 调用示例：以max_depth=1 为例
+t1 = DecisionTreeClassifier(max_depth=1, random_state=SEED)
+t1.fit(xtrain, ytrain)
+p = t1.predict_proba(xtest)[:, 1]
+roc_auc_score(ytest, p)
+print_graph(t1, xtrain.columns)
+
 #-----------pandas 常用代码
 X = X.loc[(X < 0).sum(1) == 0]  # 不含缺失数据的行（如-1， -2 值）
 df.loc[(df > 0.2).any(1)]
