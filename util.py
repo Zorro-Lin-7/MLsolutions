@@ -519,5 +519,11 @@ gb.get_group(1)  # label=1
 for name, group in gb:
     pos = group[group['y'] == 1]
     neg = group[group['y'] == 0]
+    
+# 最快筛选并替换值
+y = 1 * (df.cand_pty_affiliation == 'REP') # 将 label = 'REP' 的改为1，否则为0
+
+# 删除只有1个值的列
+X.drop(X.columns[X.std() == 0], axis=1, inplace=True)
 
 
