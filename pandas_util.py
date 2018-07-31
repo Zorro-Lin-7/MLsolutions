@@ -33,3 +33,11 @@ X.T.drop_dumplicates().T
 # 若发送递归深度报错，则执行：
 import sys
 sys.setrecursionlimit(15000) # 15000可以修改
+
+# 时间序列处理
+e6 = gb[cols].agg(lambda x: x.diff().mean())
+e6.columns = e6.columns + "_" + "diff_mean"
+
+# groupby + unstack，把month 索引变为12列（特征），并拼接各“PERSONID"
+sample.groupby(['PERSONID','month']).agg({'month':'count'})、
+      .unstack()  
