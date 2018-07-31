@@ -510,6 +510,45 @@ p = t1.predict_proba(xtest)[:, 1]
 roc_auc_score(ytest, p)
 print_graph(t1, xtrain.columns)
 
+#------- 密度聚类
+### %%time
+for e in [0.5, 0.6, 0.7, 0.8, 0.9]:
+    for m in [10,20,30,40,50]:
+        db = DBSCAN(eps=e, min_samples=m, n_jobs=-1).fit(x_)
+        core_samples_mask = np.zeros_like(db.labels_, dtype=bool)
+        core_samples_mask[db.core_sample_indices_] = True
+        labels = db.labels_
+
+        # Number of clusters in labels, ignoring noise if present.
+        n_clusters_ = len(set(labels)) - (1 if -1 in labels else 0)
+        if n_clusters_ == 0:
+            continue
+        print("e: {}, m: {}".format(e, m))
+        print('Estimated number of clusters: %d' % n_clusters_)
+        print("Silhouette Coefficient: %0.3f"
+              % silhouette_score(X, labels))
+              
+# kmean 聚类
+from sklearn.cluster import KMeans
+def clustering(df):
+    range_n_clusters = list(range(2,11))
+    for n_clusters in range_n_clusters:
+        clusterer = KMeans(n_clusters=n_clusters, random_state=SEED).fit(df)
+        preds = clusterer.predict(df)
+        centers = clusterer.cluster_centers_
+
+        score = silhouette_score(df, preds)
+        print( "For n_clusters = {}. The average silhouette_score is : {}".format(n_clusters, score))
+
+# 调参片段代码模板
+def xgbfitting(xtrain, ytrain, xvalid, yvalid, **params):
+    xg = xgb.XGBClassifier(**params)\
+            .fit(xtrain, ytrain)
+    p = xg.predict_proba(xvalid)[:,1]
+    auc = roc_auc_score(yvalid, p)
+    print(auc)
+    
+
 #-----------pandas 常用代码
 # 用字典 创建DataFrame
 pd.DataFrame.from_dict(dict, orient='index').T
