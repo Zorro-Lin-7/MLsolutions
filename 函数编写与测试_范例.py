@@ -67,3 +67,32 @@ def testFib(n):
 if __name__ == '__main__':
     testFindRood()
     testFib(5)
+    
+#----异常
+def findAnEven(L):
+    """
+        Assumes L is a list of integers.
+        Return the first even number in L.
+        Raise ValueError if L does not contain an even number.
+    """
+    for i in L:
+        if i % 2 == 0:
+            result = i
+            break
+    try:
+        return result
+    except:
+        raise ValueError('L dose not contain an evne number.')
+        
+def testfindAnEven():
+    try:
+    	print(findAnEven([1, 2, 3, 4]))
+    	print(findAnEven([4]))
+    	print(findAnEven([]))
+    	print(findAnEven([1]))
+    	print(findAnEven([4]))
+    except ValueError as msg:
+        print(msg)
+    
+if __name__ == '__main__':
+    testfindAnEven()
