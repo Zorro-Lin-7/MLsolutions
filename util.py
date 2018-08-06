@@ -166,6 +166,23 @@ nullmod = nullmod(df, target, other)
 y210 = getTargetDf(df, target, other)
 ypred = nullmod.predict(y210)
 y210[target] = ypred
+
+# 递归特征选择
+from sklearn.feature_selection import RFE
+
+estimator = xgb.XGBClassifier(**params)
+selector = RFE(estimator, 200, step=0.1)
+
+selector = selector.fit(xtrain, ytrain)
+
+p = selector.predict_proba(xvalid)
+
+roc_auc_score(yvalid, p[:, 1])
+
+
+
+
+
 #-------------------------------------------
 # KNN
 KNeighborsClassifier(n_neighbors=5,
@@ -547,5 +564,70 @@ def xgbfitting(xtrain, ytrain, xvalid, yvalid, **params):
     p = xg.predict_proba(xvalid)[:,1]
     auc = roc_auc_score(yvalid, p)
     print(auc)
+    
+# mlens 集成----------------
+
+from mlens.ensemble import SuperLearner
+from sklearn.model_selection import KFold
+
+Xstd = st.fit_transform(X)
+
+stack_test = st.transform(test.iloc[:, 1:])
+
+def get_models():
+    """Generate a library of base learners."""
+    svc = SVC(C=10, probability=True)
+    knn = KNeighborsClassifier(n_neighbors=31)
+    lr = LogisticRegression(penalty='l1', max_iter=300, C=0.1, random_state=SEED)
+    nn = MLPClassifier((320,10), early_stopping=False, random_state=SEED)
+    rf = RandomForestClassifier(n_estimators=500, 
+                                max_features=5,
+                                max_depth=10,
+                                random_state=SEED)
+    xgboost = xgb.XGBClassifier(n_estimators=500, 
+                                max_depth=10,
+                                subsample=0.6, 
+                                colsample_bytree=0.7, 
+                                reg_alpha=0.1, 
+                                )
+    
+    models = {
+        'svm': svc,
+        'knn': knn,
+        'mlp-nn': nn,
+        'random forest': rf,
+        #'gbm': gb,
+        'logistic': lr,
+        'xgb': xgboost,
+        #'ada': ada,
+        #'ext': ext,
+    }
+    return models
+
+meta_learner = GradientBoostingClassifier(
+    n_estimators = 200,
+    loss = 'exponential',
+    max_features = 4,
+    max_depth = 3,
+    subsample = 0.5,
+    random_state = SEED,
+)
+
+s2 = SuperLearner(
+    folds = 10,
+    random_state = SEED,
+    verbose = 2
+)
+
+base_learners2 = get_models()
+
+s2.add(list(base_learners2.values()), proba=True)#!!
+s2.add_meta(meta_learner, proba=True)
+s2.fit(xstd, ytrain.values)
+
+p_mlens2 = s2.predict_proba(xvstd)[:, 1]
+roc_auc_score(yvalid, p_mlens2[:,1])
+result12 = pd.DataFrame(p_mlens2[:,1], index=test.PERSONID)
+result12.to_csv('result12_637f.csv', sep='\t', header=False)
     
 
